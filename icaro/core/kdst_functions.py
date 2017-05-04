@@ -35,7 +35,7 @@ def lifetime(dst, zrange=(25,530), Erange=(1e+3, 70e3), nbins=10):
 
     for i in range(nbins):
         k0 = i * indx
-        k = (i+1) * indx
+        k = (i+1) * indx - 1
         print(' ---fit over events between {} and {}'.format(k0, k))
         st0 = time_from_timestamp(dst.time.values[k0])
         st =  time_from_timestamp(dst.time.values[k])
