@@ -164,4 +164,4 @@ def save_to_folder(outputfolder, name):
     """
     Set title and save plot in folder.
     """
-    plt.savefig("{}/{}.png".format(outputfolder, name), dpi=100)
+    plt.savefig("{}/{}.pdf".format(outputfolder, name), dpi=100)
