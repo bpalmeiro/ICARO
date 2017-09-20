@@ -27,6 +27,7 @@ from icaro.core.kdst_functions import time_from_timestamp
 from icaro.core.kdst_functions import to_deltatime
 from icaro.core.kdst_functions import lifetime_vs_t
 from icaro.core.kdst_functions import save_lifetime
+from icaro.core.kdst_functions import center_and_fit
 
 
 np.warnings.filterwarnings('ignore')
@@ -43,20 +44,29 @@ print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), end=space)
 ## Configuration
 program, *args = sys.argv
 parser = argparse.ArgumentParser(program)
-parser.add_argument("-r", metavar="run_numbers", type=int, help="run numbers"  , nargs='+')
-parser.add_argument("-t", metavar="run_tags"   , type=str, help="run tags"     , nargs='+', default=['notag'])
+parser.add_argument("-r", metavar="run_numbers", type=int, help="run numbers"  ,
+                    nargs='+')
+parser.add_argument("-t", metavar="run_tags"   , type=str, help="run tags"     ,
+                    nargs='+', default=['notag'])
 parser.add_argument("-i", metavar="input path" , type=str, help="input path"   )
-parser.add_argument("-o", metavar="database"   , type=str, help="database file", default="$ICARODIR/Alphas/Litetimes.txt")
-parser.add_argument("-c", metavar="comment"    , type=str, help="comments"     , default="")
+parser.add_argument("-o", metavar="database"   , type=str, help="database file",
+                    default="$ICARODIR/Lifetime_monitoring/Litetimes.txt")
+parser.add_argument("-c", metavar="comment"    , type=str, help="comments"     ,
+                    default="")
 parser.add_argument("-p", metavar="plotsfolder", type=str, help="plots folder" )
-parser.add_argument("--save-plots", action="store_true"  , help="store control plots" )
-parser.add_argument("--overwrite" , action="store_true"  , help="overwrite datebase values" )
+parser.add_argument("--save-plots", action="store_true"  ,
+                    help="store control plots" )
+parser.add_argument("--overwrite" , action="store_true"  ,
+                    help="overwrite datebase values" )
 
 flags, extras = parser.parse_known_args(args)
 
-flags.i = os.path.expandvars(flags.i if flags.i else "$DATADIR/")
-flags.o = os.path.expandvars(flags.o if flags.o else "$ICARODIR/icaro/Lifetime/Lifetimes.txt")
-flags.p = os.path.expandvars(flags.p if flags.p else "$ICARODIR/icaro/Lifetime/Plots/")
+flags.i = os.path.expandvars(flags.i if flags.i else
+                             "$DATADIR/")
+flags.o = os.path.expandvars(flags.o if flags.o else
+                             "$ICARODIR/icaro/Lifetime/Lifetimes.txt")
+flags.p = os.path.expandvars(flags.p if flags.p else
+                             "$ICARODIR/icaro/Lifetime/Plots/")
 
 run_numbers   = flags.r
 run_tags      = flags.t if len(flags.t) == len(flags.r) else flags.t * len(flags.r)
@@ -218,7 +228,8 @@ for run_number, run_tag in zip(run_numbers, run_tags):
 
     E_sel = np.ones_like(fid.Z.values, dtype=bool)
     if run_tag == "kr":
-        x, y, y_std = fitf.profileX(fid.Z, fid.S2e, Znbins, Zrange_LT, S2range, std=True)
+        x, y, y_std = fitf.profileX(fid.Z, fid.S2e, Znbins, Zrange_LT, S2range,
+                                    std=True)
         f_low       = fitf.fit(fitf.expo, x, y - y_std, (np.max(y), -1e3)).fn
         f_upp       = fitf.fit(fitf.expo, x, y + y_std, (np.max(y), -1e3)).fn
         E_sel       = coref.in_range(fid.S2e, f_low(fid.Z), f_upp(fid.Z))
@@ -246,7 +257,8 @@ for run_number, run_tag in zip(run_numbers, run_tags):
     dst        = fid[E_sel & coref.in_range(fid.Z, *Zrange_LT)]
     timestamps = list(map(time_from_timestamp, dst.time))
 
-    Ts, u_Ts, LTs, u_LTs, E0s, u_E0s = lifetime_vs_t(dst, nslices=8, timestamps=timestamps)
+    Ts, u_Ts, LTs, u_LTs, E0s, u_E0s = lifetime_vs_t(dst, nslices=8,
+                                                     timestamps=timestamps)
 
     errorbar(Ts, LTs, u_LTs, u_Ts)
     labels  ("Time (s)", "Lifetime (µs)", "Lifetime evolution within run")
@@ -266,9 +278,9 @@ for run_number, run_tag in zip(run_numbers, run_tags):
     cb.set_label("E (pes)")
     labels("x (mm)", "y (mm)", "Energy vs XY")
     save("EvsXY")
-    
+
     corrections = corrf.Correction((x, y), E, u_E, "index", index=(nX//2, nY//2))
-    print("Reference energy = {} pes".format(E[tuple(np.argwhere(corrections._fs==1)[0])]))    
+    print("Reference energy = {} pes".format(E[tuple(np.argwhere(corrections._fs==1)[0])]))
 
 
     #--------------------------------------------------------
@@ -282,7 +294,7 @@ for run_number, run_tag in zip(run_numbers, run_tags):
     save("QvsXY")
 
 
-    #--------------------------------------------------------    
+    #--------------------------------------------------------
     values, bins = np.histogram(cath.Z, 50)
 
     mean_val = bins[np.argmax(values)]
@@ -300,8 +312,10 @@ for run_number, run_tag in zip(run_numbers, run_tags):
     v_drift     = db.DetectorGeo().ZMAX[0]/max_drift
     u_v_drift   = v_drift*u_max_drift/max_drift
 
-    print("Drift time     : ({}) µs   ".format(measurement_string(max_drift, u_max_drift)))
-    print("Drift velocity : ({}) mm/µs".format(measurement_string(  v_drift,   u_v_drift)))
+    print("Drift time     : ({}) µs   ".format(measurement_string(max_drift,
+                                                                  u_max_drift)))
+    print("Drift velocity : ({}) mm/µs".format(measurement_string(  v_drift,
+                                                                    u_v_drift)))
 
 
     #--------------------------------------------------------

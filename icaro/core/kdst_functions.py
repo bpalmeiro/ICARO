@@ -1,16 +1,22 @@
 import os
 import datetime
 
-import numpy  as np
-import pandas as pd
+import numpy             as np
+import pandas            as pd
+import matplotlib.pyplot as plt
 
 import invisible_cities.core.fit_functions  as  fitf
 import invisible_cities.core.core_functions as coref
+import invisible_cities.reco.dst_functions  as dstf
 
 from invisible_cities.evm  .ic_containers import Measurement
 from invisible_cities.icaro.hst_functions import plot
 from invisible_cities.icaro.hst_functions import errorbar
 from invisible_cities.icaro.hst_functions import labels
+
+
+xy_map = dstf.load_xy_corrections("../Na_June_Axial/merged_corrections.h5")
+
 
 
 def create_file_if_neccessary(filename):
@@ -47,11 +53,11 @@ def save_lifetime(    filename,
     if not delete_lifetime_entry(filename, run_number, overwrite=overwrite):
         return
 
-    line = delimiter.join(map(str, [run_number,    run_tag,        
-                                            lt,       u_lt,  
+    line = delimiter.join(map(str, [run_number,    run_tag,
+                                            lt,       u_lt,
                                            E_0,       u_E0,
                                        v_drift,  u_v_drift,
-                                      t_start ,      t_end,    dt, 
+                                      t_start ,      t_end,    dt,
                                     date_start,   date_end, ddate,
                                        comment]))
 
@@ -140,18 +146,30 @@ def lifetime(dst, zrange=(25,530), Erange=(1e+3, 70e3), nbins=10):
     return CHI2, LAMBDA, ELAMBDA, TSTAMP, TIME
 
 
-def lifetime_vs_t(dst, nslices=10, nbins=10, seed=(3e4, -5e2), timestamps=None, **profOpt):
+def lifetime_vs_t(dst, nslices=10, nbins=10, seed=(3e4, -5e2), fit_range=[100,500],
+                  timestamps=None, sliced=False, slparam={} ,**profOpt):
     LT, LTu = [], []
     E0, E0u = [], []
     T ,  Tu = [], []
+
+    slparam_base={'Zrange':[0,550], 'Yrange':[4e3, 16e3], 'nZbins':50, 'step':100,
+                  'nbin_fit':100, 'seed_fit':[1e4, 12e3, 200], 'range_fit':[11e3,16e3]}
 
     tmin = np.min(dst.time)
     tmax = np.max(dst.time)
     bins = np.linspace(tmin, tmax, nslices+1)
     for t0, t1 in zip(bins[:-1], bins[1:]):
         subdst   = dst[coref.in_range(dst.time, t0, t1)]
-        Z, E, Eu = fitf.profileX(subdst.Z, subdst.S2e, nbins, **profOpt)
-        f        = fitf.fit(fitf.expo, Z, E, seed, sigma=Eu)
+        if sliced:
+            Z, E, Eu = get_E_mean_vs_z(subdst,**{**slparam_base, **slparam})
+
+        else:
+            Z, E, Eu = fitf.profileX(subdst.Z, subdst.S2e, nbins, **profOpt)
+
+        sel_Z    = fitf.in_range(Z, *fit_range)
+        f        = fitf.fit(fitf.expo, Z[sel_Z], E[sel_Z], seed, sigma=Eu[sel_Z])
+
+
 
         LT .append(-f.values[1] )
         LTu.append( f.errors[1] )
@@ -193,13 +211,61 @@ def profile_and_fit(X, Y, xrange, yrange, nbins, fitpar, fitOpt  = "r"):
     return f, x, y, u_x, u_y
 
 
-def chi2(F, X, Y, SY):
-    n = len(F.values)
-    print('degrees of freedom = {}'.format(n))
-
-    return np.abs(Y - F.fn(X))/SY/(len(X) - n)
-
 
 def print_fit(f):
     for i, val in enumerate(map(Measurement, f.values, f.errors)):
         print("Parameter {}: {}".format(i, val))
+
+
+
+def get_E_mean_vs_z(data, Zrange=[0,550], Yrange=[4e3, 16e3], nZbins=50, step=100,
+                    nbin_fit=100, seed_fit=[1e4, 12e3, 200], range_fit=[11e3,16e3]):
+
+    n_seed, mean_seed, sigma_seed = seed_fit
+    min_fin, max_fit              = range_fit
+
+    Zbins              = np.linspace(*Zrange, nZbins)
+    Z_drift, u_Z_drift = np.zeros_like(Zbins[:-1]), np.zeros_like(Zbins[:-1])
+
+    for i in range(len(Zbins)-1):
+
+        data_   = data[fitf.in_range(data.Z.values, Zbins[i], Zbins[i+1])]
+        E_zcorr = data_.S2e.values * xy_map(data_.X.values, data_.Y.values).value
+        y, x    = np.histogram(E_zcorr, nbin_fit, range=Yrange)
+        x       = x[1:]-np.diff(x)*0.5
+
+        mean_i    = mean_seed-i*step
+        min_fin_i = min_fin-i*step
+
+        seed =     n_seed,    mean_i,     sigma_seed
+        down = 0.1*n_seed, min_fin_i, 0.8*sigma_seed
+        up   = 1e4*n_seed,   max_fit,  10*sigma_seed
+
+        f    = fitf.fit(fitf.gauss, x, y, seed,
+                        fit_range=(min_fin-i*step, max_fit),
+                        bounds = [down,up])
+
+        Z_drift[i], u_Z_drift[i] = f.values[1],f.errors[1]
+
+    return Zbins[1:]-np.diff(Zbins)*0.5, Z_drift, u_Z_drift
+
+def center_and_fit(data, range_fit, nbins, fitpar, fitOpt  = "r", xrange=[0,550], yrange=[4e3, 16e3],
+                    step_slice=75, nbin_slice=100, seed_slice=[1e4, 12e3, 200],
+                    range_slice=[11e3,16e3], plot_lims=True):
+
+    u_x       = 0.5*(xrange[1] - xrange[0])/nbins
+    x, y, u_y = get_E_mean_vs_z(data, Zrange=xrange, Yrange=yrange,
+                                nZbins=nbins, step=step_slice,
+                                nbin_fit=nbin_slice, seed_fit= seed_slice,
+                                range_fit=range_slice)
+    sel_range = fitf.in_range(x, *range_fit)
+    f         = fitf.fit(fitf.expo, x[sel_range], y[sel_range], fitpar,
+                         sigma=u_y[sel_range])
+    plt.figure()
+    plt.errorbar(x, y, u_y, u_x, linestyle="none", marker=".")
+    plt.plot    (x, f.fn(x), fitOpt)
+
+    if plot_lims:
+        plt.axvline (range_fit[0], c='k', ls='dashed')
+        plt.axvline (range_fit[1], c='k', ls='dashed')
+    return f, x, y, u_x, u_y
