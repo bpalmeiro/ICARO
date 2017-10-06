@@ -166,7 +166,7 @@ def lifetime_vs_t(dst, nslices=10, nbins=10, seed=(3e4, -5e2), fit_range=[100,50
         else:
             Z, E, Eu = fitf.profileX(subdst.Z, subdst.S2e, nbins, **profOpt)
 
-        sel_Z    = fitf.in_range(Z, *fit_range)
+        sel_Z    = coref.in_range(Z, *fit_range)
         f        = fitf.fit(fitf.expo, Z[sel_Z], E[sel_Z], seed, sigma=Eu[sel_Z])
 
 
@@ -229,7 +229,7 @@ def get_E_mean_vs_z(data, Zrange=[0,550], Yrange=[4e3, 16e3], nZbins=50, step=10
 
     for i in range(len(Zbins)-1):
 
-        data_   = data[fitf.in_range(data.Z.values, Zbins[i], Zbins[i+1])]
+        data_   = data[coref.in_range(data.Z.values, Zbins[i], Zbins[i+1])]
         E_zcorr = data_.S2e.values * xy_map(data_.X.values, data_.Y.values).value
         y, x    = np.histogram(E_zcorr, nbin_fit, range=Yrange)
         x       = x[1:]-np.diff(x)*0.5
@@ -258,7 +258,7 @@ def center_and_fit(data, range_fit, nbins, fitpar, fitOpt  = "r", xrange=[0,550]
                                 nZbins=nbins, step=step_slice,
                                 nbin_fit=nbin_slice, seed_fit= seed_slice,
                                 range_fit=range_slice)
-    sel_range = fitf.in_range(x, *range_fit)
+    sel_range = coref.in_range(x, *range_fit)
     f         = fitf.fit(fitf.expo, x[sel_range], y[sel_range], fitpar,
                          sigma=u_y[sel_range])
     plt.figure()

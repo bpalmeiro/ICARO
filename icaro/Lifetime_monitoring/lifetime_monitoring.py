@@ -11,6 +11,8 @@ import invisible_cities.core.core_functions as coref
 import invisible_cities.reco. dst_functions as dstf
 import invisible_cities.core. fit_functions as fitf
 import invisible_cities.database.load_db    as db
+import invisible_cities.reco.corrections    as corrf
+
 
 from invisible_cities.icaro.hst_functions import plot
 from invisible_cities.icaro.hst_functions import errorbar
@@ -50,7 +52,7 @@ parser.add_argument("-t", metavar="run_tags"   , type=str, help="run tags"     ,
                     nargs='+', default=['notag'])
 parser.add_argument("-i", metavar="input path" , type=str, help="input path"   )
 parser.add_argument("-o", metavar="database"   , type=str, help="database file",
-                    default="$ICARODIR/Lifetime_monitoring/Litetimes.txt")
+                    default="$ICARODIR/icaro/Lifetime_monitoring/Lifetimes.txt")
 parser.add_argument("-c", metavar="comment"    , type=str, help="comments"     ,
                     default="")
 parser.add_argument("-p", metavar="plotsfolder", type=str, help="plots folder" )
@@ -82,6 +84,7 @@ Xrange        = -198, 198
 Yrange        = -198, 198
 Zrange        =    0, 600
 Zrange_LT     =   50, 500
+Tnbins        =   50
 Xnbins        =   50
 Ynbins        =   50
 Znbins        =   50
@@ -90,6 +93,9 @@ S2nbins       =   50
 
 XYrange       = Xrange, Yrange
 XYnbins       = Xnbins, Ynbins
+
+
+
 
 Rfiducial     = 100 # in mm
 Zcathode      = 500 # in µs
@@ -272,26 +278,26 @@ for run_number, run_tag in zip(run_numbers, run_tags):
     #--------------------------------------------------------
     x, y, E, u_E = fitf.profileXY(full.X.values, full.Y.values,
                                   full.S2e.values * Zcorr(full.Z.values).value,
-                                  nX, nY, Xrange, Yrange)
+                                  Xnbins, Ynbins, Xrange, Yrange)
 
     _, cb = display_matrix(x, y, E)
     cb.set_label("E (pes)")
-    labels("x (mm)", "y (mm)", "Energy vs XY")
-    save("EvsXY")
+    labels ("x (mm)", "y (mm)", "Energy vs XY")
+    savefig("EvsXY")
 
-    corrections = corrf.Correction((x, y), E, u_E, "index", index=(nX//2, nY//2))
+    corrections = corrf.Correction((x, y), E, u_E, "index", index=(Xnbins//2, Ynbins//2))
     print("Reference energy = {} pes".format(E[tuple(np.argwhere(corrections._fs==1)[0])]))
 
 
     #--------------------------------------------------------
     x, y, Q, u_Q = fitf.profileXY(full.X.values, full.Y.values,
                                   full.S2q.values,
-                                  nX, nY, Xrange, Yrange)
+                                  Xnbins, Ynbins, Xrange, Yrange)
 
     _, cb = display_matrix(x, y, Q)
     cb.set_label("Q (pes)")
-    labels("x (mm)", "y (mm)", "Charge vs XY")
-    save("QvsXY")
+    labels ("x (mm)", "y (mm)", "Charge vs XY")
+    savefig("QvsXY")
 
 
     #--------------------------------------------------------
